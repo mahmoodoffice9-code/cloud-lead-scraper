@@ -69,7 +69,7 @@ def home():
                     <label>Target Location</label>
                     <input type="text" id="location" placeholder="e.g. New York">
                 </div>
-                <button type="button" id="submit-btn">Generate Leads</button>
+                <button type="button" onclick="fetchLeads()">Generate Leads</button>
             </div>
 
             <div id="loader">Extracting targeted leads from the cloud... ⏳</div>
@@ -80,7 +80,7 @@ def home():
         <script>
             let currentLeads = [];
 
-            document.getElementById('submit-btn').addEventListener('click', async function() {
+            async function fetchLeads() {
                 const keyword = document.getElementById('keyword').value.trim();
                 const location = document.getElementById('location').value.trim();
                 const loader = document.getElementById('loader');
@@ -95,7 +95,7 @@ def home():
                 resultsSection.innerHTML = '';
 
                 try {
-                    const response = await fetch(`/api/scrape?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}`);
+                    const response = await fetch(`/scrape?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}`);
                     const data = await response.json();
 
                     loader.style.display = 'none';
@@ -106,7 +106,7 @@ def home():
                             <div class="results-header">
                                 <h3>Results for "${data.keyword}" in "${data.location}"</h3>
                                 <div>
-                                    <button type="button" class="download-btn" id="download-csv-btn">📥 Download CSV</button>
+                                    <button type="button" class="download-btn" onclick="downloadCSV()">📥 Download CSV</button>
                                     <span style="margin-left: 10px;">Total Leads: <strong>${currentLeads.length}</strong></span>
                                 </div>
                             </div>
@@ -123,9 +123,6 @@ def home():
                         });
 
                         resultsSection.innerHTML = html;
-
-                        // Attach event listener for dynamic download button
-                        document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
                     } else {
                         resultsSection.innerHTML = '<p class="no-data">No leads found. Try a different keyword or location.</p>';
                     }
@@ -133,7 +130,7 @@ def home():
                     loader.style.display = 'none';
                     resultsSection.innerHTML = `<p class="no-data" style="color: #ef4444;">Error fetching leads: ${error.message}</p>`;
                 }
-            });
+            }
 
             function downloadCSV() {
                 if (currentLeads.length === 0) return;
@@ -158,7 +155,7 @@ def home():
     """
 
 
-@app.get('/api/scrape')
+@app.get('/scrape')
 def scrape_leads(
     keyword: str = Query(..., description='Target niche'),
     location: str = Query(..., description='Target location'),
