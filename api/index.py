@@ -10,7 +10,6 @@ app = FastAPI()
 
 
 def clean_ddg_url(raw_url):
-  """Extracts the real target website URL from DuckDuckGo redirect link."""
   if 'uddg=' in raw_url:
     try:
       parsed = urlparse(raw_url)
@@ -78,76 +77,76 @@ def home():
         </div>
 
         <script>
-            let currentLeads = [];
+            let globalLeads = [];
 
             async function fetchLeads() {
-                const keyword = document.getElementById('keyword').value.trim();
-                const location = document.getElementById('location').value.trim();
-                const loader = document.getElementById('loader');
-                const resultsSection = document.getElementById('results-section');
+                const keywordInput = document.getElementById('keyword').value.trim();
+                const locationInput = document.getElementById('location').value.trim();
+                const loaderDiv = document.getElementById('loader');
+                const resultsDiv = document.getElementById('results-section');
 
-                if (!keyword || !location) {
+                if (!keywordInput || !locationInput) {
                     alert('Please fill in both fields!');
                     return;
                 }
 
-                loader.style.display = 'block';
-                resultsSection.innerHTML = '';
+                loaderDiv.style.display = 'block';
+                resultsDiv.innerHTML = '';
 
                 try {
-                    const response = await fetch(`/scrape?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}`);
-                    const data = await response.json();
+                    const res = await fetch('/scrape?keyword=' + encodeURIComponent(keywordInput) + '&location=' + encodeURIComponent(locationInput));
+                    const json = await res.json();
 
-                    loader.style.display = 'none';
-                    currentLeads = data.leads || [];
+                    loaderDiv.style.display = 'none';
+                    globalLeads = json.leads || [];
 
-                    if (currentLeads.length > 0) {
-                        let html = `
+                    if (globalLeads.length > 0) {
+                        let htmlOutput = `
                             <div class="results-header">
-                                <h3>Results for "${data.keyword}" in "${data.location}"</h3>
+                                <h3>Results for "` + json.keyword + `" in "` + json.location + `"</h3>
                                 <div>
                                     <button type="button" class="download-btn" onclick="downloadCSV()">📥 Download CSV</button>
-                                    <span style="margin-left: 10px;">Total Leads: <strong>${currentLeads.length}</strong></span>
+                                    <span style="margin-left: 10px;">Total Leads: <strong>` + globalLeads.length + `</strong></span>
                                 </div>
                             </div>
                         `;
 
-                        currentLeads.forEach((lead, index) => {
-                            html += `
+                        globalLeads.forEach(function(lead, index) {
+                            htmlOutput += `
                                 <div class="lead-card">
-                                    <h3>#${index + 1} Business Lead</h3>
-                                    <p style="margin-bottom: 8px; color: #cbd5e1; font-size: 14px;">${lead.title}</p>
-                                    <a href="${lead.link}" target="_blank">🔗 ${lead.link}</a>
+                                    <h3>#` + (index + 1) + ` Business Lead</h3>
+                                    <p style="margin-bottom: 8px; color: #cbd5e1; font-size: 14px;">` + lead.title + `</p>
+                                    <a href="` + lead.link + `" target="_blank">🔗 ` + lead.link + `</a>
                                 </div>
                             `;
                         });
 
-                        resultsSection.innerHTML = html;
+                        resultsDiv.innerHTML = htmlOutput;
                     } else {
-                        resultsSection.innerHTML = '<p class="no-data">No leads found. Try a different keyword or location.</p>';
+                        resultsDiv.innerHTML = '<p class="no-data">No leads found. Try a different keyword or location.</p>';
                     }
-                } catch (error) {
-                    loader.style.display = 'none';
-                    resultsSection.innerHTML = `<p class="no-data" style="color: #ef4444;">Error fetching leads: ${error.message}</p>`;
+                } catch (err) {
+                    loaderDiv.style.display = 'none';
+                    resultsDiv.innerHTML = '<p class="no-data" style="color: #ef4444;">Error fetching leads: ' + err.message + '</p>';
                 }
             }
 
             function downloadCSV() {
-                if (currentLeads.length === 0) return;
+                if (globalLeads.length === 0) return;
                 
-                let csvContent = "data:text/csv;charset=utf-8,Title,Website\n";
-                currentLeads.forEach(lead => {
-                    let cleanTitle = lead.title ? lead.title.replace(/"/g, '""') : "";
-                    csvContent += `"${cleanTitle}","${lead.link}"\n`;
+                let csvContent = "data:text/csv;charset=utf-8,Title,Website\\n";
+                globalLeads.forEach(function(lead) {
+                    let safeTitle = lead.title ? lead.title.replace(/"/g, '""') : "";
+                    csvContent += '"' + safeTitle + '","' + lead.link + '"\\n';
                 });
 
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "targeted_leads.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                let encodedUri = encodeURI(csvContent);
+                let downloadLink = document.createElement("a");
+                downloadLink.setAttribute("href", encodedUri);
+                downloadLink.setAttribute("download", "targeted_leads.csv");
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
             }
         </script>
     </body>
