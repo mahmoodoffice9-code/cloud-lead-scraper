@@ -43,7 +43,7 @@ def home():
             input:focus { outline: none; border-color: #38bdf8; }
             button { align-self: flex-end; padding: 12px 25px; background: #0284c7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; height: 44px; }
             button:hover { background: #0ea5e9; }
-            .download-btn { background: #10b981; margin-bottom: 15px; }
+            .download-btn { background: #10b981; }
             .download-btn:hover { background: #059669; }
             
             #loader { text-align: center; display: none; color: #38bdf8; margin: 20px 0; font-weight: 600; }
@@ -69,7 +69,7 @@ def home():
                     <label>Target Location</label>
                     <input type="text" id="location" placeholder="e.g. New York">
                 </div>
-                <button onclick="fetchLeads()">Generate Leads</button>
+                <button type="button" id="submit-btn">Generate Leads</button>
             </div>
 
             <div id="loader">Extracting targeted leads from the cloud... ⏳</div>
@@ -80,7 +80,7 @@ def home():
         <script>
             let currentLeads = [];
 
-            async function fetchLeads() {
+            document.getElementById('submit-btn').addEventListener('click', async function() {
                 const keyword = document.getElementById('keyword').value.trim();
                 const location = document.getElementById('location').value.trim();
                 const loader = document.getElementById('loader');
@@ -106,8 +106,8 @@ def home():
                             <div class="results-header">
                                 <h3>Results for "${data.keyword}" in "${data.location}"</h3>
                                 <div>
-                                    <button class="download-btn" onclick="downloadCSV()">📥 Download CSV</button>
-                                    <span>Total Leads: <strong>${currentLeads.length}</strong></span>
+                                    <button type="button" class="download-btn" id="download-csv-btn">📥 Download CSV</button>
+                                    <span style="margin-left: 10px;">Total Leads: <strong>${currentLeads.length}</strong></span>
                                 </div>
                             </div>
                         `;
@@ -123,6 +123,9 @@ def home():
                         });
 
                         resultsSection.innerHTML = html;
+
+                        // Attach event listener for dynamic download button
+                        document.getElementById('download-csv-btn').addEventListener('click', downloadCSV);
                     } else {
                         resultsSection.innerHTML = '<p class="no-data">No leads found. Try a different keyword or location.</p>';
                     }
@@ -130,14 +133,14 @@ def home():
                     loader.style.display = 'none';
                     resultsSection.innerHTML = `<p class="no-data" style="color: #ef4444;">Error fetching leads: ${error.message}</p>`;
                 }
-            }
+            });
 
             function downloadCSV() {
                 if (currentLeads.length === 0) return;
                 
                 let csvContent = "data:text/csv;charset=utf-8,Title,Website\n";
                 currentLeads.forEach(lead => {
-                    let cleanTitle = lead.title.replace(/"/g, '""');
+                    let cleanTitle = lead.title ? lead.title.replace(/"/g, '""') : "";
                     csvContent += `"${cleanTitle}","${lead.link}"\n`;
                 });
 
@@ -190,7 +193,6 @@ def scrape_leads(
           raw_link = link_tag.get('href')
           clean_link = clean_ddg_url(raw_link)
 
-          # Ads ya tracking links ko skip karne ke liye check
           if 'duckduckgo.com' not in clean_link:
             leads.append({
                 'title': title_tag.get_text(strip=True),
