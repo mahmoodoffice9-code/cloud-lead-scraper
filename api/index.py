@@ -1,9 +1,25 @@
+import csv
+import io
+from urllib.parse import parse_qs, urlparse
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import requests
 
 app = FastAPI()
+
+
+def clean_ddg_url(raw_url):
+  """Extracts the real target website URL from DuckDuckGo redirect link."""
+  if 'uddg=' in raw_url:
+    try:
+      parsed = urlparse(raw_url)
+      qs = parse_qs(parsed.query)
+      if 'uddg' in qs:
+        return qs['uddg'][0]
+    except:
+      pass
+  return raw_url
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -27,9 +43,11 @@ def home():
             input:focus { outline: none; border-color: #38bdf8; }
             button { align-self: flex-end; padding: 12px 25px; background: #0284c7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; height: 44px; }
             button:hover { background: #0ea5e9; }
+            .download-btn { background: #10b981; margin-bottom: 15px; }
+            .download-btn:hover { background: #059669; }
             
             #loader { text-align: center; display: none; color: #38bdf8; margin: 20px 0; font-weight: 600; }
-            .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; flex-wrap: gap; }
+            .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; flex-wrap: wrap; gap: 10px; }
             .lead-card { background: #334155; padding: 18px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #38bdf8; }
             .lead-card h3 { font-size: 16px; margin-bottom: 8px; color: #f1f5f9; }
             .lead-card a { color: #38bdf8; text-decoration: none; word-break: break-all; font-size: 14px; }
@@ -60,6 +78,8 @@ def home():
         </div>
 
         <script>
+            let currentLeads = [];
+
             async function fetchLeads() {
                 const keyword = document.getElementById('keyword').value.trim();
                 const location = document.getElementById('location').value.trim();
@@ -79,19 +99,23 @@ def home():
                     const data = await response.json();
 
                     loader.style.display = 'none';
+                    currentLeads = data.leads || [];
 
-                    if (data.leads && data.leads.length > 0) {
+                    if (currentLeads.length > 0) {
                         let html = `
                             <div class="results-header">
                                 <h3>Results for "${data.keyword}" in "${data.location}"</h3>
-                                <span>Total Leads: <strong>${data.total_leads}</strong></span>
+                                <div>
+                                    <button class="download-btn" onclick="downloadCSV()">📥 Download CSV</button>
+                                    <span>Total Leads: <strong>${currentLeads.length}</strong></span>
+                                </div>
                             </div>
                         `;
 
-                        data.leads.forEach((lead, index) => {
+                        currentLeads.forEach((lead, index) => {
                             html += `
                                 <div class="lead-card">
-                                    <h3>#${index + 1} Business Profile</h3>
+                                    <h3>#${index + 1} Business Lead</h3>
                                     <p style="margin-bottom: 8px; color: #cbd5e1; font-size: 14px;">${lead.title}</p>
                                     <a href="${lead.link}" target="_blank">🔗 ${lead.link}</a>
                                 </div>
@@ -106,6 +130,24 @@ def home():
                     loader.style.display = 'none';
                     resultsSection.innerHTML = `<p class="no-data" style="color: #ef4444;">Error fetching leads: ${error.message}</p>`;
                 }
+            }
+
+            function downloadCSV() {
+                if (currentLeads.length === 0) return;
+                
+                let csvContent = "data:text/csv;charset=utf-8,Title,Website\n";
+                currentLeads.forEach(lead => {
+                    let cleanTitle = lead.title.replace(/"/g, '""');
+                    csvContent += `"${cleanTitle}","${lead.link}"\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "targeted_leads.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
         </script>
     </body>
@@ -145,10 +187,15 @@ def scrape_leads(
         link_tag = result.find('a', class_='result__url')
 
         if title_tag and link_tag:
-          leads.append({
-              'title': title_tag.get_text(strip=True),
-              'link': link_tag.get('href'),
-          })
+          raw_link = link_tag.get('href')
+          clean_link = clean_ddg_url(raw_link)
+
+          # Ads ya tracking links ko skip karne ke liye check
+          if 'duckduckgo.com' not in clean_link:
+            leads.append({
+                'title': title_tag.get_text(strip=True),
+                'link': clean_link,
+            })
   except Exception as e:
     return {'error': str(e)}
 
